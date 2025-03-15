@@ -49,7 +49,8 @@ export function CharacterTable({
       params.set(type, value);
     }
     
-    params.set("page", "1");
+    const currentPage = params.get("page") || "1";
+    params.set("page", currentPage);
     
     router.push(`/characters?${params.toString()}`);
   };

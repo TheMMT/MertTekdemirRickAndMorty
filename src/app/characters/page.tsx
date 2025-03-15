@@ -4,6 +4,7 @@ import { CharacterTable } from "@/components/character-table";
 import { Pagination } from "@/components/ui/pagination";
 import { PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Character } from "@/types/rick-and-morty";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Characters | Rick and Morty Explorer",
@@ -40,137 +41,151 @@ export default async function CharactersPage({
 }) {
   const params = await Promise.resolve(searchParams || {});
   
-  const currentPage = Number(params.page) || 1;
+  let currentPage = Number(params.page) || 1;
   const status = typeof params.status === 'string' ? params.status : undefined;
   const gender = typeof params.gender === 'string' ? params.gender : undefined;
   
-  const { info, results } = await getCharacters(currentPage, status, gender);
+  try {
+    const { info, results } = await getCharacters(currentPage, status, gender);
 
-  const createPageUrl = (page: number) => {
-    const urlParams = new URLSearchParams();
-    urlParams.set("page", page.toString());
-    if (status) urlParams.set("status", status);
-    if (gender) urlParams.set("gender", gender);
-    return `/characters?${urlParams.toString()}`;
-  };
-
-  const getPageNumbers = (current: number, total: number, display: number = 5) => {
-    if (total <= display) {
-      return Array.from({ length: total }, (_, i) => i + 1);
+    if (currentPage > info.pages && info.pages > 0) {
+      const redirectUrl = `/characters?${new URLSearchParams({
+        ...(status ? { status } : {}),
+        ...(gender ? { gender } : {}),
+        page: info.pages.toString(),
+      }).toString()}`;
+      
+      redirect(redirectUrl);
     }
 
-    const middle = Math.floor(display / 2);
-    let start = current - middle;
-    
-    if (start < 1) {
-      start = 1;
-    }
-    
-    if (start + display - 1 > total) {
-      start = total - display + 1;
-    }
-    
-    return Array.from({ length: display }, (_, i) => start + i);
-  };
+    const createPageUrl = (page: number) => {
+      const urlParams = new URLSearchParams();
+      urlParams.set("page", page.toString());
+      if (status) urlParams.set("status", status);
+      if (gender) urlParams.set("gender", gender);
+      return `/characters?${urlParams.toString()}`;
+    };
 
-  const pageNumbers = getPageNumbers(currentPage, info.pages);
+    const getPageNumbers = (current: number, total: number, display: number = 5) => {
+      if (total <= display) {
+        return Array.from({ length: total }, (_, i) => i + 1);
+      }
 
-  return (
-    <main className="container py-10 space-y-8">
-      <div className="space-y-4">
-        <h1 className="text-4xl font-bold tracking-tight rick-morty-gradient">Characters</h1>
-        <p className="text-muted-foreground">
-          Browse through all the characters from Rick and Morty universe.
-          Use the filters to find specific characters.
-        </p>
-      </div>
+      const middle = Math.floor(display / 2);
+      let start = current - middle;
+      
+      if (start < 1) {
+        start = 1;
+      }
+      
+      if (start + display - 1 > total) {
+        start = total - display + 1;
+      }
+      
+      return Array.from({ length: display }, (_, i) => start + i);
+    };
 
-      <Suspense 
-        fallback={
-          <div className="w-full h-[400px] rounded-lg border animate-pulse bg-card/50" />
-        }
-      >
-        <CharacterTable
-          characters={results}
-          totalPages={info.pages}
-          currentPage={currentPage}
-        />
-      </Suspense>
+    const pageNumbers = getPageNumbers(currentPage, info.pages);
 
-      <Pagination className="my-6 overflow-x-auto pb-2">
-        <PaginationContent className="flex-wrap justify-center gap-1 sm:flex-nowrap">
-          {currentPage > 1 && (
-            <PaginationItem className="hidden sm:flex">
-              <PaginationPrevious href={createPageUrl(currentPage - 1)} />
-            </PaginationItem>
-          )}
+    return (
+      <main className="container py-10 space-y-8">
+        <div className="space-y-4">
+          <h1 className="text-4xl font-bold tracking-tight rick-morty-gradient">Characters</h1>
+          <p className="text-muted-foreground">
+            Browse through all the characters from Rick and Morty universe.
+            Use the filters to find specific characters.
+          </p>
+        </div>
 
-          {currentPage > 1 && (
-            <PaginationItem className="sm:hidden">
-              <PaginationLink href={createPageUrl(currentPage - 1)} aria-label="Previous Page">
-                <span className="sr-only">Previous</span>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </PaginationLink>
-            </PaginationItem>
-          )}
+        <Suspense 
+          fallback={
+            <div className="w-full h-[400px] rounded-lg border animate-pulse bg-card/50" />
+          }
+        >
+          <CharacterTable
+            characters={results}
+            totalPages={info.pages}
+            currentPage={currentPage}
+          />
+        </Suspense>
 
-          {currentPage > 3 && info.pages > 5 && (
-            <>
-              <PaginationItem>
-                <PaginationLink href={createPageUrl(1)}>1</PaginationLink>
+        <Pagination className="my-6 overflow-x-auto pb-2">
+          <PaginationContent className="flex-wrap justify-center gap-1 sm:flex-nowrap">
+            {currentPage > 1 && (
+              <PaginationItem className="hidden sm:flex">
+                <PaginationPrevious href={createPageUrl(currentPage - 1)} />
               </PaginationItem>
-              {currentPage > 4 && (
-                <PaginationItem className="hidden sm:flex">
-                  <span className="flex h-9 w-9 items-center justify-center text-sm">...</span>
-                </PaginationItem>
-              )}
-            </>
-          )}
+            )}
 
-          {pageNumbers.map((pageNumber) => (
-            <PaginationItem key={pageNumber}>
-              <PaginationLink
-                href={createPageUrl(pageNumber)}
-                isActive={currentPage === pageNumber}
-              >
-                {pageNumber}
-              </PaginationLink>
-            </PaginationItem>
-          ))}
-
-          {currentPage < info.pages - 2 && info.pages > 5 && (
-            <>
-              {currentPage < info.pages - 3 && (
-                <PaginationItem className="hidden sm:flex">
-                  <span className="flex h-9 w-9 items-center justify-center text-sm">...</span>
-                </PaginationItem>
-              )}
-              <PaginationItem>
-                <PaginationLink href={createPageUrl(info.pages)}>{info.pages}</PaginationLink>
+            {currentPage > 1 && (
+              <PaginationItem className="sm:hidden">
+                <PaginationLink href={createPageUrl(currentPage - 1)} aria-label="Previous Page">
+                  <span className="sr-only">Previous</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </PaginationLink>
               </PaginationItem>
-            </>
-          )}
+            )}
 
-          {currentPage < info.pages && (
-            <PaginationItem className="sm:hidden">
-              <PaginationLink href={createPageUrl(currentPage + 1)} aria-label="Next Page">
-                <span className="sr-only">Next</span>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </PaginationLink>
-            </PaginationItem>
-          )}
+            {currentPage > 3 && info.pages > 5 && (
+              <>
+                <PaginationItem>
+                  <PaginationLink href={createPageUrl(1)}>1</PaginationLink>
+                </PaginationItem>
+                {currentPage > 4 && (
+                  <PaginationItem className="hidden sm:flex">
+                    <span className="flex h-9 w-9 items-center justify-center text-sm">...</span>
+                  </PaginationItem>
+                )}
+              </>
+            )}
 
-          {currentPage < info.pages && (
-            <PaginationItem className="hidden sm:flex">
-              <PaginationNext href={createPageUrl(currentPage + 1)} />
-            </PaginationItem>
-          )}
-        </PaginationContent>
-      </Pagination>
-    </main>
-  );
+            {pageNumbers.map((pageNumber) => (
+              <PaginationItem key={pageNumber}>
+                <PaginationLink
+                  href={createPageUrl(pageNumber)}
+                  isActive={currentPage === pageNumber}
+                >
+                  {pageNumber}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+
+            {currentPage < info.pages - 2 && info.pages > 5 && (
+              <>
+                {currentPage < info.pages - 3 && (
+                  <PaginationItem className="hidden sm:flex">
+                    <span className="flex h-9 w-9 items-center justify-center text-sm">...</span>
+                  </PaginationItem>
+                )}
+                <PaginationItem>
+                  <PaginationLink href={createPageUrl(info.pages)}>{info.pages}</PaginationLink>
+                </PaginationItem>
+              </>
+            )}
+
+            {currentPage < info.pages && (
+              <PaginationItem className="sm:hidden">
+                <PaginationLink href={createPageUrl(currentPage + 1)} aria-label="Next Page">
+                  <span className="sr-only">Next</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </PaginationLink>
+              </PaginationItem>
+            )}
+
+            {currentPage < info.pages && (
+              <PaginationItem className="hidden sm:flex">
+                <PaginationNext href={createPageUrl(currentPage + 1)} />
+              </PaginationItem>
+            )}
+          </PaginationContent>
+        </Pagination>
+      </main>
+    );
+  } catch (error) {
+    console.error(error);
+  }
 }
